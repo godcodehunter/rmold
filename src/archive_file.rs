@@ -24,7 +24,7 @@
 // /usr/lib/x86_64-linux-gnu/libc.a`.
 use std::{str, slice::from_raw_parts};
 
-use crate::{Context, mold::MappedFile, filetype::{FileType, get_file_type}};
+use crate::{Context, elf_mold::MappedFile, filetype::{FileType, get_file_type}};
 
 struct ArHdr {
     ar_name: [char; 16],
@@ -155,7 +155,7 @@ fn read_fat_archive_members<'a, E>(ctx: &Context<E>, mf: &MappedFile) -> Vec<&'a
     let buff = Vec::<&MappedFile>::new();
     let strtab: &str;
 
-  while begin + mf.size - data >= 2 {
+  while begin + mf.len - data >= 2 {
     if (begin - data) % 2 {
         data += 1;
     }
