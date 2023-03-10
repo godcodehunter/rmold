@@ -1,4 +1,4 @@
-enum FileType {
+pub enum FileType {
     UNKNOWN,
     EMPTY,
     ELF_OBJ,
@@ -22,7 +22,7 @@ fn is_gcc_lto_obj(mf: *const MappedFile<C>) {
 
 }
 
-fn get_file_type(mf: *const MappedFile<C>) -> FileType {
+pub fn get_file_type(mf: *const MappedFile<C>) -> FileType {
     let data = mf.get_contents();
 
     if data.empty() {
