@@ -1,6 +1,9 @@
+// output_tmpfile;
+// opt_demangle;
+
 pub static mold_version: &'static str;
 pub static mold_product_name: &'static str;
-pub static mold_version: String;
+pub static mold_version_string: String;
 pub static mold_git_hash: String;
 
 //

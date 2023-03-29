@@ -1,8 +1,61 @@
 use std::collections::{HashSet, HashMap};
+use crate::hyperloglog;
 
 use super::elf::MachineType;
 
 pub enum ChunkKind { HEADER, OUTPUT_SECTION, SYNTHETIC }
+
+/// Chunk represents a contiguous region in an output file.
+struct Chunk {
+
+}
+
+/// Mergeable section fragments
+struct SectionFragment {
+
+}
+
+struct MergedSection {
+    estimator: hyperloglog::HyperLogLog, 
+    map: HashMap<SectionFragment>,
+    shard_offsets: Vec<i64>,
+    once_flag: ,
+}
+
+impl MergedSection {
+    fn get_instance() {
+
+    }
+
+    fn insert() {
+
+    }
+
+    fn assign_offsets() {
+
+    }
+    
+    fn copy_buf() {
+
+    }
+
+    fn write_to() {
+        
+    }
+
+    // TODO: use concurent map version  
+    fn print_stats(&self) {
+        let used = self.map.len();
+        let free = self.map.capacity();
+
+        println!(
+            "name={} estimation={}, actual={}", 
+            self.name, 
+            free, 
+            used
+        );
+    }
+}
 
 /// InputFile is the base class of ObjectFile and SharedFile.
 struct InputFile<E> {
@@ -742,20 +795,20 @@ struct Cli {
     oformat_binary: bool,
     omagic: bool,
     pack_dyn_relocs_relr: bool,
-    perf: bool,
+    pub perf: bool,
     pic: bool,
     pie: bool,
     print_gc_sections: bool,
     print_icf_sections: bool,
-    print_map: bool,
-    quick_exit: bool,
+    pub print_map: bool,
+    pub quick_exit: bool,
     relax: bool,
     relocatable: bool,
     repro: bool,
     rosegment: bool,
     shared: bool,
     start_stop: bool,
-    stats: bool,
+    pub stats: bool,
     strip_all: bool,
     strip_debug: bool,
     trace: bool,
@@ -779,7 +832,7 @@ struct Cli {
     z_relro: bool,
     z_shstk: bool,
     z_text: bool,
-    emulation: MachineType,
+    pub emulation: MachineType,
     filler: i64,
     print_dependencies: i64,
     spare_dynamic_tags: i64,
@@ -790,7 +843,7 @@ struct Cli {
     pub Map: String,
     chroot: String,
     dependency_file: String,
-    directory: String,
+    pub directory: String,
     dynamic_linker: String,
     entry: String, 
     fini: String,
@@ -801,11 +854,11 @@ struct Cli {
     rpaths: String,
     soname: String,
     sysroot: String,
-    retain_symbols_file: Box<HashSet<&str>>, 
+    pub retain_symbols_file: Box<HashSet<&str>>, 
     section_align: HashMap<&str, u64>,
     section_start: HashMap<&str, u64>, 
     ignore_ir_file: HashSet<&str>, 
-    wrap: HashSet<&str>, 
+    pub wrap: HashSet<&str>, 
     section_order: Vec<SectionOrder>,
     defsyms: Vec<(&Symbol, Def)>, 
     library_paths: Vec<String>, 
@@ -942,7 +995,7 @@ struct VersionPattern {
 /// It contains command line flags, pointers to singleton objects
 /// (such as linker-synthesized output sections), unique_ptrs for
 /// resource management, and other miscellaneous objects.
-pub struct Context<E> {
+pub struct Context<const MT: MachineType> {
     pub args: Cli,
     version_patterns: Vec<VersionPattern>,
     default_version: u16,
@@ -964,14 +1017,17 @@ pub struct Context<E> {
     // // Symbol table
     // tbb::concurrent_hash_map<std::string_view, Symbol<E>, HashCmp> symbol_map;
     // tbb::concurrent_hash_map<std::string_view, ComdatGroup, HashCmp> comdat_groups;
-    // tbb::concurrent_vector<std::unique_ptr<MergedSection<E>>> merged_sections;
+    // TODO: tbb::concurrent_vector<std::unique_ptr<MergedSection<E>>> merged_sections;
+    pub merged_sections: Vec<MergedSection>,
+    
     // tbb::concurrent_vector<std::unique_ptr<Chunk<E>>> output_chunks;
     // std::vector<std::unique_ptr<OutputSection<E>>> output_sections;
     // obj_cache: FileCache<E, ObjectFile<E>>,
     // dso_cache: FileCache<E, SharedFile<E>>,
 
     // tbb::concurrent_vector<std::unique_ptr<TimerRecord>> timer_records;
-    // tbb::concurrent_vector<std::function<void()>> on_exit;
+    // TODO: tbb::concurrent_vector<std::function<void()>> on_exit;
+    pub on_exit: Vec<FnMut>,
 
     // tbb::concurrent_vector<std::unique_ptr<ObjectFile<E>>> obj_pool;
     // tbb::concurrent_vector<std::unique_ptr<SharedFile<E>>> dso_pool;
@@ -1201,13 +1257,13 @@ impl Default for Context<E> {
     }
 }
 
-impl Context<E> {
-    fn new() {
+impl<const MT: MachineType> Context<MT> {
+    pub fn new() -> Self {
 
     }
 
-    fn checkpoint() {
-        
+    pub fn checkpoint() {
+        todo!();
     }
 
     fn open_library(&self) {

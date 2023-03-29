@@ -45,7 +45,7 @@ fn get_map<E>(ctx: &Context<E>) -> Map<E> {
     map
 }
 
-fn print_map<E>(ctx: &Context<E>) {
+pub fn print_map<E>(ctx: &Context<E>) {
     let mut target: &dyn Write = &io::stdout();
 
     if !ctx.args.Map.is_empty() {

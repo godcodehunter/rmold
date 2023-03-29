@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+clap = {versiom = "4.1.13", features = ["derive"]}
 rayon = "1.6.0"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+typed-builder = "0.14.0"

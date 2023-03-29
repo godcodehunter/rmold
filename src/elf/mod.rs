@@ -7,6 +7,7 @@ use crate::filetype;
 use crate::elf;
 
 use self::elf::MachineType;
+use self::mold::Context;
 
 // Read the beginning of a given file and returns its machine type
 // (e.g. EM_X86_64 or EM_386).
@@ -117,6 +118,73 @@ fn redo_main() {
 
 }
 
-fn elf_main() {
- 
+use clap::{Parser, Subcommand};
+use std::{process::Command, path::{PathBuf, Path}};
+
+#[derive(Parser)]
+struct Cli {
+   #[command(subcommand)]
+   run: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// 
+    Run { prog: PathBuf, args: Vec<PathBuf>},
+}
+
+fn get_self_path() -> PathBuf {
+    std::env::current_exe().unwrap().file_name().unwrap()
+}
+
+fn get_dso_path(prog: PathBuf) -> PathBuf {
+    let paths = [
+        prog.parent().unwrap().join(Path::new("mold-wrapper.so")),
+        Path::new(env!("MOLD_LIBDIR")).join(Path::new("/mold/mold-wrapper.so")),
+        prog.parent().unwrap().join(Path::new("../lib/mold/mold-wrapper.so")),
+    ];
+    
+    for path in paths {
+        if path.is_file() {
+            return path;
+        }
+    }
+    
+    panic!("mold-wrapper.so is missing");
+}
+
+pub fn main<const MT: MachineType>() {
+    let ctx = Context::<MT>::new();
+    let cli = Cli::parse();
+    
+    match &cli.run {
+        Commands::Run { prog, args} => { 
+            if cfg!(not(target_family = "unix")) {
+                panic!("subcommand run is supported only on Unix family os system");
+            }
+            
+            let self_path = get_self_path();
+            let dso_path = get_dso_path(&self_path);
+
+            let mut real_prog = prog;
+            let args = std::env::args().skip(3);
+            
+            let file_name = prog.file_name().unwrap().to_str();
+            if matches!(file_name, Some("ld" | "ld.lld" | "ld.gold")) {
+                real_prog = &self_path;
+            }
+
+            Command::new(real_prog)
+                .env("LD_PRELOAD", self_path)
+                .env("MOLD_PATH", dso_path)
+                .args(args)
+                .spawn()
+                .expect("TODO TODO TODO");
+        }
+    }
+
+    // If no -m option is given, deduce it from input files.
+    if ctx.args.emulation == MachineType::NONE {
+        ctx.args.emulation = deduce_machine_type()
+    }
 }

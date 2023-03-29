@@ -19,13 +19,17 @@ fn assign_if_gt(atomic: &AtomicU8, new: u8) {
     assign_if(atomic, new, |old, new| old < new)
 }
 
+fn assign_if_ls(atomic: &AtomicU8, new: u8) {
+    assign_if(atomic, new, |old, new| old > new)
+}
+
 // This file implements HyperLogLog algorithm, which estimates
 // the number of unique items in a given multiset.
 //
 // For more info, read
 // https://engineering.fb.com/2018/12/13/data-infrastructure/hyperloglog
 
-struct HyperLogLog<const NBUCKETS: usize> {
+pub struct HyperLogLog<const NBUCKETS: usize> {
     buckets: [AtomicU8; NBUCKETS],
 }
 

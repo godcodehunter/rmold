@@ -1,4 +1,4 @@
-use std::{io::{Write, Seek}, fs::File, sync::atomic::AtomicU8, intrinsics::powif64};
+use std::{io::{Write, Seek}, fs::File};
 
 /// A tar file consists of one or more Ustar header followed by data.
 /// Each Ustar header represents a single file in an archive.
@@ -29,9 +29,9 @@ struct UstarHeader {
     pad: [u8; 12],
 }
 
-/// The `Default` trait is implemented manually because the `Default` macro in Rust 
-/// only supports arrays types with a length up to 32 characters. 
-/// When the const-generic implementation is added (https://github.com/rust-lang/rust/issues/61415), 
+/// The `Default` trait is implemented manually because the `Default` macro in Rust
+/// only supports arrays types with a length up to 32 characters.
+/// When the const-generic implementation is added (https://github.com/rust-lang/rust/issues/61415),
 /// the ad-hoc implementation can be refactored.
 impl Default for UstarHeader {
     fn default() -> Self {
@@ -69,10 +69,10 @@ impl UstarHeader {
         self.checksum.fill(b' ');
         self.magic.copy_from_slice(b"ustar");
         self.magic.copy_from_slice(b"00");
-        
+
         let bytes = self.as_slice();
         let sum= bytes.iter().fold(0 as i64, |acc, x| acc + (*x as i64));
-        // TODO: assert 
+        // TODO: assert
         write!(&mut self.checksum[..], "{:06o}", sum).unwrap();
     }
 }
@@ -99,28 +99,28 @@ struct TarWriter {
 
 impl TarWriter {
     const BLOCK_SIZE: usize = 512;
-   
+
     pub fn open(output_path: String, basedir: String) -> Result<Self, std::io::Error> {
         let out = File::create(output_path)?;
         Ok(Self { out, basedir })
-    }   
+    }
 
     pub fn append(&mut self, path: String, data: String) -> Result<(), std::io::Error>{
         // Write PAX header
-        // TODO: assert 
+        // TODO: assert
         let mut pax = UstarHeader::default();
         let attr = encode_path(self.basedir, path);
         write!(&mut pax.size[..], "{:011o}", attr.len()).unwrap();
         pax.typeflag[0] = b'x';
         pax.finalize();
         self.out.write(pax.as_slice())?;
-       
+
         // Write pathname
         self.out.write(attr.as_bytes())?;
         // TODO: fseek(out, align_to(ftell(out), BLOCK_SIZE), SEEK_SET);
         let offset = ;
         self.out.seek(std::io::SeekFrom::Start())?;
-        
+
         // Write Ustar header
         let mut ustar = UstarHeader::default();
         ustar.mode.copy_from_slice(b"0000664");
