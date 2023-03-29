@@ -6,6 +6,7 @@ mod filetype;
 mod mold;
 mod elf;
 mod hyperloglog;
+mod perf;
 
 // static SHA256_SIZE: i32 = 32;
 

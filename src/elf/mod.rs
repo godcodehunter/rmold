@@ -5,6 +5,7 @@ mod mapfile;
 use crate::mold;
 use crate::filetype;
 use crate::elf;
+use crate::perf::Counter;
 
 use self::elf::MachineType;
 use self::mold::Context;
@@ -110,8 +111,83 @@ fn read_input_files() {
 
 }
 
-fn show_stats() {
+fn show_stats<const MT: MachineType>(ctx: &Context<MT>) {
+    for obj in ctx.objs {
+        let defined_syms = Counter::builder().name("defined_syms").build();
+        defined_syms.add(obj.parent.first_global - 1);
+        
+        let undefinde_syms = Counter::builder().name("undefined_syms").build();
+        undefinde_syms.add(obj.parent.symbols.len() - obj.parent.first_global);
 
+        let alloc = Counter::builder().name("reloc_alloc").build();
+        let nonalloc = Counter::builder().name("reloc_alloc").build();
+        
+        obj.sections.iter()
+            .filter(|sec| sec.is_alive.load())
+            .for_each(|sec| {
+                let len = sec.get_rels().len();
+                if sec.shdr().sh_flags & SHF_ALLOC {
+                    alloc.add(len);
+                } else {
+                    nonalloc.add(len);
+                }
+            });
+
+        let comdats = Counter::builder().name("comdats").build();
+        comdats.add(obj.comdat_groups.len());
+
+        let removed_comdats = Counter::builder().name("removed_comdat_mem").build();
+        for (group, span) in obj.comdat_groups {
+            if group.owner != obj.priority {
+                removed_comdats.add(span.len());
+            }
+        }
+
+        let num_cies = Counter::builder().name("num_cies").build();
+        num_cies.add(obj.cies.len());
+
+        let num_unique_cies = Counter::builder().name("num_unique_cies").build();
+        for cie in obj.cies {
+            if cie.is_leader {
+                num_unique_cies.inc();
+            }
+        }
+
+        let num_fdes =  Counter::builder().name("num_fdes").build();
+        num_fdes.add(obj.fdes.len());
+    }
+
+    let num_bytes = Counter::builder().name("num_fdes").build();
+    for mf in ctx.mf_pool {
+        num_bytes.add(mf.len());
+    }
+    let num_input_sections = Counter::builder().name("input_sections").build();
+    for file in ctx.objs {
+        num_input_sections.add(file.sections.len());
+    }
+
+    let num_output_chunks = Counter::builder().name("output_chunks").build();
+    let num_objs = Counter::builder().name("num_objs").build();
+    let num_dsos = Counter::builder().name("num_dsos").build();
+
+    num_output_chunks.add(ctx.chunks.len());
+    num_objs.add(ctx.objs.len());
+    num_dsos.add(ctx.dsos.len());
+
+    if MT.is_need_thunk() {
+        let thunk_bytes = Counter::builder().name("thunk_bytes").build();
+        for osec in ctx.output_sections {
+            for thunk in osec.thunk {
+                thunk_bytes.add(thunk.len()); 
+            }
+        }
+    }
+
+    crate::perf::Stats::print();
+
+    for sec in ctx.merged_sections {
+        sec.print_stats()
+    }
 }
 
 fn redo_main() {
@@ -119,6 +195,7 @@ fn redo_main() {
 }
 
 use clap::{Parser, Subcommand};
+use std::process::exit;
 use std::{process::Command, path::{PathBuf, Path}};
 
 #[derive(Parser)]
@@ -129,18 +206,21 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// 
-    Run { prog: PathBuf, args: Vec<PathBuf>},
+    Run { target: PathBuf, args: Vec<PathBuf>},
 }
 
-fn get_self_path() -> PathBuf {
-    std::env::current_exe().unwrap().file_name().unwrap()
-}
-
+/// Finds the first existing path to `mold-wrapper.so` file in the 
+/// following directories: 
+/// 
+/// * `{PROG_DIR}/mold-wrapper.so` - same directory as the executable is
+/// * `${MOLD_LIBDIR}/mold/mold-wrapper.so` - which is /usr/local/lib/mold by default
+/// * `{ALL_P_D}../lib/mold/mold-wrapper.so` - 
+/// 
+/// panics if it doesn't.
 fn get_dso_path(prog: PathBuf) -> PathBuf {
     let paths = [
         prog.parent().unwrap().join(Path::new("mold-wrapper.so")),
-        Path::new(env!("MOLD_LIBDIR")).join(Path::new("/mold/mold-wrapper.so")),
+        Path::new(env!("MOLD_LIBDIR")).join(Path::new("mold/mold-wrapper.so")),
         prog.parent().unwrap().join(Path::new("../lib/mold/mold-wrapper.so")),
     ];
     
@@ -158,18 +238,18 @@ pub fn main<const MT: MachineType>() {
     let cli = Cli::parse();
     
     match &cli.run {
-        Commands::Run { prog, args} => { 
+        Commands::Run { target, args} => { 
             if cfg!(not(target_family = "unix")) {
                 panic!("subcommand run is supported only on Unix family os system");
             }
             
-            let self_path = get_self_path();
+            let self_path = std::env::current_exe().unwrap().file_name().unwrap();
             let dso_path = get_dso_path(&self_path);
 
-            let mut real_prog = prog;
+            let mut real_prog = target;
             let args = std::env::args().skip(3);
             
-            let file_name = prog.file_name().unwrap().to_str();
+            let file_name = target.file_name().unwrap().to_str();
             if matches!(file_name, Some("ld" | "ld.lld" | "ld.gold")) {
                 real_prog = &self_path;
             }
@@ -179,12 +259,79 @@ pub fn main<const MT: MachineType>() {
                 .env("MOLD_PATH", dso_path)
                 .args(args)
                 .spawn()
-                .expect("TODO TODO TODO");
+                .expect("target launch error");
         }
     }
+
+    todo!();
+    // Parse non-positional command line options
+    // ctx.cmdline_args = expand_response_files(ctx, argv);
+    // std::vector<std::string> file_args = parse_nonpositional_args(ctx);
 
     // If no -m option is given, deduce it from input files.
     if ctx.args.emulation == MachineType::NONE {
         ctx.args.emulation = deduce_machine_type()
     }
+
+    todo!();
+    // // Redo if -m is not x86-64.
+    //   if constexpr (std::is_same_v<E, X86_64>)
+    //   if (ctx.arg.emulation != MachineType::X86_64)
+    //     return redo_main<E>(argc, argv, ctx.arg.emulation);
+
+    Timer t_all(ctx, "all");
+
+    if !ctx.args.directory.is_empty() {
+        
+    }
+
+    if ctx.arg.relocatable {
+        combine_objects(ctx, file_args);
+        return;
+    }
+
+    for name in ctx.args.wrap {
+        get_symbol(ctx, name).wrap = true;
+    }
+
+    for name in ctx.arg.retain_symbols_file {
+        get_symbol(ctx, name).write_to_symtab = true;
+    }
+
+    // Close the output file. This is the end of the linker's main job.
+    ctx.output_file->close(ctx);
+
+    if !ctx.args.dependency_file.is_empty() {
+        write_dependency_file(ctx);
+    }
+
+    if ctx.has_lto_object {
+        lto_cleanup(ctx);
+    }
+
+    t_total.stop();
+    t_all.stop();
+
+    if ctx.args.print_map {
+        mapfile::print_map(ctx);
+    }
+
+    if ctx.args.stats {
+        show_stats(ctx)
+    }
+
+    if ctx.args.perf {
+        print_timer_records(ctx.timer_records)
+    }
+
+    if on_complete {
+        on_complete = fork_child();
+    }
+
+    if ctx.args.quick_exit {
+        todo!();   
+    }
+    
+    ctx.on_exit.for_each(|f| f());
+    ctx.checkpoint();
 }

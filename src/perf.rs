@@ -1,55 +1,53 @@
+use std::sync::atomic::{ AtomicUsize, Ordering};
 use typed_builder::TypedBuilder;
 
-static counter_manager: CounterManager = Default::default();
-
-struct CounterManager {
+pub struct Stats {
     enabled: bool,
     instances: Vec<Counter>,
 }
 
-impl CounterManager {
-    pub fn print() {
-        
+impl Stats {
+    pub fn counters() {
+
     }
 }
 
 // Counter is used to collect statistics numbers.
 #[derive(TypedBuilder)]
 #[builder(build_method(vis="", name=__build))]
-struct Counter {
-    #[builder(default)]
+pub struct Counter {
+    #[builder(default, setter(into))]
     name: String,
+    #[builder(default, setter(into))]
+    description: String,
     #[builder(default, setter(into))]
     value: AtomicUsize,
 }
 
 impl Counter {
     pub fn value(&self) -> usize {
-        self.value
+        self.value.load(Ordering::Relaxed)
     }
 
-    pub fn increment(&mut self) {
-        self.value += 1;  
+    pub fn inc(&mut self) {
+        self.value.fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn add(&mut self, other: usize) {
-        self.value += other;
-    }
-
-    pub fn print(&self) {
-        
+        self.value.fetch_add(other, Ordering::Relaxed);
     }
 }
 
 #[allow(non_camel_case_types)]
 impl<
-    __name: CounterBuilder_Optional<String>,
-    __value: CounterBuilder_Optional<usize>,
-> CounterBuilder<(__name, __value)> {
-    
+        __name: CounterBuilder_Optional<String>,
+        __description: CounterBuilder_Optional<String>,
+        __value: CounterBuilder_Optional<AtomicUsize>,
+    > CounterBuilder<(__name, __description, __value)>
+{
     pub fn build(self) -> Counter {
         let counter = self.__build();
-        
+
         counter
     }
 }

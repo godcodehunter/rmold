@@ -44,7 +44,7 @@ impl MergedSection {
     }
 
     // TODO: use concurent map version  
-    fn print_stats(&self) {
+    pub fn print_stats(&self) {
         let used = self.map.len();
         let free = self.map.capacity();
 
@@ -120,14 +120,48 @@ struct InputFile<E> {
 // InputSection represents a section in an input object file.
 struct InputSection<E> {
     pub file: &ObjectFile<E>,
+    // For COMDAT de-duplication and garbage collection
+    pub is_alive: AtomicBool,
+}
+
+impl<E> InputSection<E> {
+    pub fn uncompress() {}
+    pub fn uncompress_to() {}
+    pub fn scan_relocations() {}
+    pub fn write_to() {}
+    pub fn apply_reloc_alloc() {}
+    pub fn apply_reloc_nonalloc() {}
+    pub fn kil() {}
+
+    pub fn name() {}
+    pub fn get_priority() {}
+    pub fn get_addr() {}
+    pub fn get_addend() {}
+    pub fn shder() {}
+}
+
+// A comdat section typically represents an inline function,
+// which are de-duplicated by the linker.
+//
+// For each inline function, there's one comdat section, which
+// contains section indices of the function code and its data such as
+// string literals, if any.
+//
+// Comdat sections are identified by its signature. If two comdat
+// sections have the same signature, the linker picks up one and
+// discards the other by eliminating all sections that the other
+// comdat section refers to.
+struct ComdatGroup {
+    // The file priority of the owner file of this comdat section.
+
 }
 
 // ObjectFile represents an input .o file.
 // class ObjectFile : public InputFile<E> {
 // public:
+#[derive(Default)]
 struct ObjectFile<E> {
     pub parent: InputFile<E>,
-  ObjectFile() = default;
 
   static ObjectFile<E> *create(Context<E> &ctx, MappedFile<Context<E>> *mf,
                                std::string archive_name, bool is_in_lib);
@@ -152,14 +186,17 @@ struct ObjectFile<E> {
   InputSection<E> *get_section(const ElfSym<E> &esym);
 
   std::string archive_name;
-  std::vector<std::unique_ptr<InputSection<E>>> sections;
+  // TODO: std::vector<std::unique_ptr<InputSection<E>>> sections;
+  pub sections: Vec<InputSection<E>>,
+
   std::vector<std::unique_ptr<MergeableSection<E>>> mergeable_sections;
   bool is_in_lib = false;
   std::vector<ElfShdr<E>> elf_sections2;
-  std::vector<CieRecord<E>> cies;
-  std::vector<FdeRecord<E>> fdes;
+  pub cies: Vec<CieRecord<E>>;
+  pub fde: Vec<FdeRecord<E>>;
   std::vector<const char *> symvers;
-  std::vector<std::pair<ComdatGroup *, std::span<U32<E>>>> comdat_groups;
+//   std::vector<std::pair<ComdatGroup *, std::span<U32<E>>> > comdat_groups;
+  pub comdat_groups: Vec<(ComdatGroup, )>,
   bool exclude_libs = false;
   std::vector<std::pair<u32, u32>> gnu_properties;
   bool is_lto_obj = false;
@@ -1016,7 +1053,8 @@ pub struct Context<const MT: MachineType> {
 
     // // Symbol table
     // tbb::concurrent_hash_map<std::string_view, Symbol<E>, HashCmp> symbol_map;
-    // tbb::concurrent_hash_map<std::string_view, ComdatGroup, HashCmp> comdat_groups;
+    // TODO: tbb::concurrent_hash_map<std::string_view, ComdatGroup, HashCmp> comdat_groups;
+    pub comdat_groups: HashMap<&str, ComdatGroup>,
     // TODO: tbb::concurrent_vector<std::unique_ptr<MergedSection<E>>> merged_sections;
     pub merged_sections: Vec<MergedSection>,
     
@@ -1043,6 +1081,7 @@ pub struct Context<const MT: MachineType> {
 
     // // Input files
     pub objs: Vec<&ObjectFile<E>>,
+    pub dsos: Vec<SharedFile<E>>,
     // std::vector<SharedFile<E> *> dsos;
     // ObjectFile<E> *internal_obj = nullptr;
 

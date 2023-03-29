@@ -15,6 +15,12 @@ pub enum MachineType {
     M68K,
 }
 
+impl MachineType {
+    pub const fn is_need_thunk(&self) -> bool {
+        todo!()
+    }
+}
+
 pub const EM_NONE: u32 = 0;
 pub const EM_386: u32 = 3;
 pub const EM_68K: u32 = 4;
