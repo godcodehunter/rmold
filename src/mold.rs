@@ -26,3 +26,8 @@ pub struct MappedFile {
 //   #endif
 }
 
+impl MappedFile {
+    pub fn open() -> Self {
+
+    }
+}

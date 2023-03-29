@@ -5,6 +5,7 @@ mod mapfile;
 use crate::mold;
 use crate::filetype;
 use crate::elf;
+use crate::mold::MappedFile;
 use crate::perf::Counter;
 
 use self::elf::MachineType;
@@ -80,15 +81,23 @@ fn new_object_file(ctx: &Context<E>, mf: *const MappedFile<Context<E>>, archive_
 
 }
 
-fn new_lto_obj() {
+fn new_lto_obj<const MT: MachineType>(ctx: &Context<MT>) -> Option<> {
+    if ctx.args.ignore_ir_file {
 
+    }
+
+    let mut file = read_lto_object(ctx, mf);
+    file.priority = ctx.file_priority
+    file.archive_name = archive_name;
+    file.is_in_lib = ;
+    file.is_alive = ;
 }
 
 fn new_shared_file() {
 
 }
 
-fn read_file(&ctx: Context<E>, mf: *const MappedFile<Context<E>>) {
+fn read_file(ctx: &Context<E>, mf: *const MappedFile<Context<E>>) {
     if (ctx.visited.contains(mf->name))
         return;
 
@@ -99,16 +108,51 @@ fn deduce_machine_type() {
 
 }
 
-fn open_library() {
+fn open_library<const MT: MachineType>(ctx: &Context<MT>, path: Path) -> Option<> {
+    if let Some(mf) = MappedFile::open(ctx, path) {
+        return mf;
+    }
 
+    let ty = get_machine_type(ctx, mf);
+    if ty == MachineType::NONE || ty == MT {
+        return mf;
+    }
+    println!("WARN: {}: skipping incompatible file {}", path, ty);
+
+    None
 }
 
-fn find_library() {
+fn find_library<const MT: MachineType>(ctx: &Context<MT>, name: Path) {
+    if name.starts_with(':') {
+        for dir in ctx.args.library_paths {
+            name = name.strip_prefix(":").unwrap();
+            let path = dir.join(name);
+            if Some(mf) = open_library(ctx, path) {
+                return mf;
+            }
+        }
+        panic!("library not found: {}", name.as_ref());
+    }
 
+    for dir in ctx.args.library_paths {
+        let mut stem = dir.join("lib").join(name);
+        if !ctx.is_static {
+            stem.set_extension(".so");
+            if Some(mf) = open_library(ctx, path) {
+                return mf;
+            }
+        }
+        stem.set_extension(".a");
+        if Some(mf) = open_library(ctx, path) {
+            return mf;
+        }
+    }
+
+    panic!("library not found: {}", name.as_ref());
 }
 
-fn read_input_files() {
-
+fn read_input_files<const MT: MachineType>(ctx: &Context<MT>)  {
+    
 }
 
 fn show_stats<const MT: MachineType>(ctx: &Context<MT>) {

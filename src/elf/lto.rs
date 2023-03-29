@@ -42,3 +42,79 @@ enum PluginTag {
     LDPT_ADD_SYMBOLS_V2,
     LDPT_GET_API_VERSION,
 }
+
+enum PluginApiVersion {
+    LD_PLUGIN_API_VERSION = 1,
+}
+
+struct PluginTagValue {}
+
+enum PluginOutputFileType {
+    LDPO_REL,
+    LDPO_EXEC,
+    LDPO_DYN,
+    LDPO_PIE,
+}
+
+struct PluginInputFile {}
+
+struct PluginSection {}
+
+struct PluginSymbol {}
+
+enum PluginSymbolKind {
+    LDPK_DEF,
+    LDPK_WEAKDEF,
+    LDPK_UNDEF,
+    LDPK_WEAKUNDEF,
+    LDPK_COMMON,
+}
+
+enum PluginSymbolVisibility {
+    LDPV_DEFAULT,
+    LDPV_PROTECTED,
+    LDPV_INTERNAL,
+    LDPV_HIDDEN,
+}
+
+enum PluginSymbolType {
+    LDST_UNKNOWN,
+    LDST_FUNCTION,
+    LDST_VARIABLE,
+}
+
+enum PluginSymbolSectionKind {
+    LDSSK_DEFAULT,
+    LDSSK_BSS,
+}
+
+enum PluginSymbolResolution {
+    LDPR_UNKNOWN,
+    LDPR_UNDEF,
+    LDPR_PREVAILING_DEF,
+    LDPR_PREVAILING_DEF_IRONLY,
+    LDPR_PREEMPTED_REG,
+    LDPR_PREEMPTED_IR,
+    LDPR_RESOLVED_IR,
+    LDPR_RESOLVED_EXEC,
+    LDPR_RESOLVED_DYN,
+    LDPR_PREVAILING_DEF_IRONLY_EXP,
+}
+
+enum PluginLevel {
+    LDPL_INFO,
+    LDPL_WARNING,
+    LDPL_ERROR,
+    LDPL_FATAL,
+}
+
+enum PluginLinkerAPIVersion {
+    LAPI_V0,
+    LAPI_V1,
+}
+
+type OnloadFn = fn(&mut PluginTagValue) -> PluginStatus;
+type ClaimFileHandler = fn(&PluginTagValue, &u32) -> PluginStatus;
+type AllSymbolsReadHandler = fn() -> PluginStatus;
+type CleanupHandler = fn() -> PluginStatus;
+type NewInputHandler = fn(&PluginTagValue) -> PluginStatus;

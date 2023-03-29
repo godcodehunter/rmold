@@ -1,4 +1,4 @@
-use std::collections::{HashSet, HashMap};
+use std::{collections::{HashSet, HashMap}, path::Path};
 use crate::hyperloglog;
 
 use super::elf::MachineType;
@@ -898,7 +898,7 @@ struct Cli {
     pub wrap: HashSet<&str>, 
     section_order: Vec<SectionOrder>,
     defsyms: Vec<(&Symbol, Def)>, 
-    library_paths: Vec<String>, 
+    pub library_paths: Vec<Path>, 
     plugin_opt: Vec<String>, 
     version_definitions: Vec<String>,
     auxiliary: Vec<&str>, 
@@ -1042,10 +1042,10 @@ pub struct Context<const MT: MachineType> {
     // Reader context
     as_needed: bool,
     whole_archive: bool,
-    is_static: bool,
+    pub is_static: bool,
     in_lib: bool,
     file_priority: i64,
-    visited: HashSet<&str>, 
+    pub visited: HashSet<&str>, 
     tg: tbb::task_group,
 
     has_error: bool,
