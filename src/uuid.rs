@@ -1,4 +1,4 @@
-fn get_uuid_v4() -> [u8; 16] {
+fn gen_uuid_v4() -> [u8; 16] {
     let mut bytes;
     let mut rand = rand::thread_rng();
     let buf: [u32; 4] = [rand.gen(), rand.gen(), rand.gen(), rand.gen()];

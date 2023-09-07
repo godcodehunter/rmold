@@ -1,4 +1,8 @@
-use std::{io::{Write, Seek}, fs::File};
+use crate::mold::align_to;
+use std::{
+    fs::File,
+    io::{Seek, Write}, path::Path,
+};
 
 /// A tar file consists of one or more Ustar header followed by data.
 /// Each Ustar header represents a single file in an archive.
@@ -71,20 +75,21 @@ impl UstarHeader {
         self.magic.copy_from_slice(b"00");
 
         let bytes = self.as_slice();
-        let sum= bytes.iter().fold(0 as i64, |acc, x| acc + (*x as i64));
+        let sum = bytes.iter().fold(0 as i64, |acc, x| acc + (*x as i64));
         // TODO: assert
         write!(&mut self.checksum[..], "{:06o}", sum).unwrap();
     }
 }
 
-fn encode_path(basedir: String, path: String) -> String {
+fn encode_path(basedir: Path, path: Path) -> String {
     path = path_clean(basedir + "/" + path);
 
     // Construct a string which contains something like
     // "16 path=foo/bar\n" where 16 is the size of the string
     // including the size string itself.
     let len = " path=\n".len() + path.len();
-    let total = len.to_string().len() + len;
+    let mut total = len.to_string().len() + len;
+    total = total.to_string().len() + len;
     total.to_string() + " path=" + &path + "\n"
 }
 
@@ -92,20 +97,21 @@ fn encode_path(basedir: String, path: String) -> String {
 //
 // If you pass `--repro` to mold, mold collects all input files and
 // put them into `<output-file-path>.repro.tar`, so that it is easy to
+// run the same command with the same command line arguments.
 struct TarWriter {
     out: File,
-    basedir: String,
+    basedir: Path,
 }
 
 impl TarWriter {
     const BLOCK_SIZE: usize = 512;
 
-    pub fn open(output_path: String, basedir: String) -> Result<Self, std::io::Error> {
+    pub fn open(output_path: Path, basedir: Path) -> Result<Self, std::io::Error> {
         let out = File::create(output_path)?;
         Ok(Self { out, basedir })
     }
 
-    pub fn append(&mut self, path: String, data: String) -> Result<(), std::io::Error>{
+    pub fn append(&mut self, path: Path, data: String) -> Result<(), std::io::Error> {
         // Write PAX header
         // TODO: assert
         let mut pax = UstarHeader::default();
@@ -117,26 +123,28 @@ impl TarWriter {
 
         // Write pathname
         self.out.write(attr.as_bytes())?;
-        // TODO: fseek(out, align_to(ftell(out), BLOCK_SIZE), SEEK_SET);
-        let offset = ;
-        self.out.seek(std::io::SeekFrom::Start())?;
+        let offset = align_to(self.out.stream_position()?, Self::BLOCK_SIZE);
+        self.out.seek(std::io::SeekFrom::Start(offset))?;
 
         // Write Ustar header
         let mut ustar = UstarHeader::default();
-        ustar.mode.copy_from_slice(b"0000664");
+        ustar.mode.copy_from_slice("0000664");
         write!(&mut ustar.size[..], "{:011o}", data.len()).unwrap();
         ustar.finalize();
         self.out.write(ustar.as_slice())?;
 
         // Write file contents
         self.out.write(data.as_bytes())?;
-        // TODO: fseek(out, align_to(ftell(out), BLOCK_SIZE), SEEK_SET);
+        let offset = align_to(self.out.stream_position()?, Self::BLOCK_SIZE);
+        self.out.seek(std::io::SeekFrom::Start(offset))?;
 
         // A tar file must ends with two empty blocks, so write such
         // terminator and seek back.
-        let terminator = [ 0u8; Self::BLOCK_SIZE * 2];
+        let terminator = [0u8; Self::BLOCK_SIZE * 2];
         self.out.write(&terminator)?;
-        // TODO: ...
+        self.out.seek(std::io::SeekFrom::End(-Self::BLOCK_SIZE * 2))?;
+
+        debug_assert!(self.out.stream_position() % Self::BLOCK_SIZE == 0);
 
         Ok(())
     }
