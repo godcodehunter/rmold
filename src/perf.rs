@@ -1,15 +1,20 @@
-use std::sync::atomic::{ AtomicUsize, Ordering};
+#![feature(option_get_or_insert_default)]
+
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Mutex,
+    }, panic::Location,
+};
 use typed_builder::TypedBuilder;
 
-pub struct Stats {
-    enabled: bool,
-    instances: Vec<Counter>,
-}
+static COUNTERS: Mutex<Option<HashMap<String, &'static AtomicUsize>>> = Mutex::new(None);
+static COUNTERS_META: Mutex<Option<HashMap<String, CounterMeta>>> = Mutex::new(None); 
 
-impl Stats {
-    pub fn counters() {
-
-    }
+struct CounterMeta {
+    name: String,
+    description: String,
 }
 
 // Counter is used to collect statistics numbers.
@@ -24,30 +29,59 @@ pub struct Counter {
     value: AtomicUsize,
 }
 
-impl Counter {
-    pub fn value(&self) -> usize {
-        self.value.load(Ordering::Relaxed)
-    }
-
-    pub fn inc(&mut self) {
-        self.value.fetch_add(1, Ordering::Relaxed);
-    }
-
-    pub fn add(&mut self, other: usize) {
-        self.value.fetch_add(other, Ordering::Relaxed);
-    }
-}
-
 #[allow(non_camel_case_types)]
 impl<
-        __name: CounterBuilder_Optional<String>,
-        __description: CounterBuilder_Optional<String>,
-        __value: CounterBuilder_Optional<AtomicUsize>,
+    __name: ::typed_builder::Optional<String>,
+    __description: ::typed_builder::Optional<String>,
+    __value: ::typed_builder::Optional<AtomicUsize>,
     > CounterBuilder<(__name, __description, __value)>
 {
-    pub fn build(self) -> Counter {
-        let counter = self.__build();
+    #[track_caller]
+    pub fn build(self) -> &'static AtomicUsize {
+        let mut counter_guard = COUNTERS.lock().unwrap();
+        let counter_map = counter_guard.get_or_insert_default();
 
-        counter
+        let mut meta_guard = COUNTERS_META.lock().unwrap();
+        let meta_map = meta_guard.get_or_insert_default();
+
+        let counter = self.__build();
+        let location = Location::caller();
+        let key = format!(
+            "{}:{}:{}",
+            location.file(),
+            location.line(),
+            location.column(),
+        );
+        
+        meta_map.entry(key.clone()).or_insert(CounterMeta {
+            name: counter.name,
+            description: counter.description,
+        });
+
+        counter_map.entry(key).or_insert({
+            let item = Box::new(counter.value);
+            Box::leak(item)
+        })
     }
 }
+
+// pub struct Stats {
+//     instances: Vec<Counter>,
+// }
+
+// pub struct Timer {
+//     name: String,
+//     record: TimerRecord,
+// }
+
+// impl Timer {
+//     pub fn new(name: &str) -> Self {
+//         todo!()
+//     }
+// }
+
+// impl Drop for Timer {
+//     fn drop(&mut self) {
+//         self.record.stop()
+//     }
+// }

@@ -62,6 +62,7 @@ impl Default for UstarHeader {
 }
 
 impl UstarHeader {
+    // Represent whole struct as byte slice 
     fn as_slice(&self) -> &[u8] {
         let size = std::mem::size_of::<Self>();
         let pointer = self as *const Self;
@@ -69,14 +70,15 @@ impl UstarHeader {
         bytes
     }
 
+    // Set `magic`, `version` and `checksum`
     fn finalize(&mut self) {
         self.checksum.fill(b' ');
         self.magic.copy_from_slice(b"ustar");
-        self.magic.copy_from_slice(b"00");
+        self.version.copy_from_slice(b"00");
 
         let bytes = self.as_slice();
         let sum = bytes.iter().fold(0 as i64, |acc, x| acc + (*x as i64));
-        // TODO: assert
+
         write!(&mut self.checksum[..], "{:06o}", sum).unwrap();
     }
 }
@@ -109,11 +111,10 @@ impl TarWriter {
     pub fn open(output_path: Path, basedir: Path) -> Result<Self, std::io::Error> {
         let out = File::create(output_path)?;
         Ok(Self { out, basedir })
-    }
+    }   
 
-    pub fn append(&mut self, path: Path, data: String) -> Result<(), std::io::Error> {
+    pub fn append(&mut self, path: Path, data: &[u8]) -> Result<(), std::io::Error> {
         // Write PAX header
-        // TODO: assert
         let mut pax = UstarHeader::default();
         let attr = encode_path(self.basedir, path);
         write!(&mut pax.size[..], "{:011o}", attr.len()).unwrap();
@@ -134,7 +135,7 @@ impl TarWriter {
         self.out.write(ustar.as_slice())?;
 
         // Write file contents
-        self.out.write(data.as_bytes())?;
+        self.out.write(data)?;
         let offset = align_to(self.out.stream_position()?, Self::BLOCK_SIZE);
         self.out.seek(std::io::SeekFrom::Start(offset))?;
 
